@@ -10,6 +10,7 @@ const meals = ['Frühstück', 'Mittagessen', 'Abendessen'];
 
 const dayContainer = document.getElementById('days');
 const prevButton = document.getElementById('prev-days');
+const todayButton = document.getElementById('today-days');
 const nextButton = document.getElementById('next-days');
 
 const weekdayFormatter = new Intl.DateTimeFormat('de-DE', {
@@ -43,10 +44,18 @@ function createMealRow(label) {
   return row;
 }
 
-function createDayCard(date, offset, todayYear) {
+function isSameDay(firstDate, secondDate) {
+  return (
+    firstDate.getFullYear() === secondDate.getFullYear() &&
+    firstDate.getMonth() === secondDate.getMonth() &&
+    firstDate.getDate() === secondDate.getDate()
+  );
+}
+
+function createDayCard(date, offset, todayYear, todayDate) {
   const card = document.createElement('article');
   card.className = 'day-card';
-  if (offset === 0) {
+  if (isSameDay(date, todayDate)) {
     card.classList.add('day-card--today');
   }
 
@@ -82,6 +91,9 @@ function createDayCard(date, offset, todayYear) {
 }
 
 function calculateSlots() {
+  if (window.innerWidth && window.innerWidth <= 640) {
+    return 1;
+  }
   const styles = getComputedStyle(document.documentElement);
   const cardWidth = parseInt(styles.getPropertyValue('--card-width'), 10);
   const cardHeight = parseInt(styles.getPropertyValue('--card-height'), 10);
@@ -110,8 +122,9 @@ function renderDays() {
 
   for (let i = 0; i < slots; i += 1) {
     const date = new Date(today);
-    date.setDate(today.getDate() + i + startOffset);
-    const card = createDayCard(date, i + startOffset, todayYear);
+    const offsetFromToday = i + startOffset;
+    date.setDate(today.getDate() + offsetFromToday);
+    const card = createDayCard(date, offsetFromToday, todayYear, today);
     dayContainer.appendChild(card);
   }
 }
@@ -130,11 +143,50 @@ if (prevButton) {
   });
 }
 
+if (todayButton) {
+  todayButton.addEventListener('click', () => {
+    startOffset = 0;
+    renderDays();
+  });
+}
+
 if (nextButton) {
   nextButton.addEventListener('click', () => {
     startOffset += calculateSlots();
     renderDays();
   });
+}
+
+if (dayContainer) {
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  dayContainer.addEventListener(
+    'touchstart',
+    (event) => {
+      touchStartX = event.changedTouches[0].screenX;
+    },
+    { passive: true }
+  );
+
+  dayContainer.addEventListener(
+    'touchend',
+    (event) => {
+      touchEndX = event.changedTouches[0].screenX;
+      const delta = touchEndX - touchStartX;
+      const threshold = 50;
+      if (Math.abs(delta) < threshold) {
+        return;
+      }
+      if (delta > 0) {
+        startOffset -= calculateSlots();
+      } else {
+        startOffset += calculateSlots();
+      }
+      renderDays();
+    },
+    { passive: true }
+  );
 }
 
 renderDays();
