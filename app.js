@@ -188,6 +188,8 @@ function createMealRow(label, dateKey) {
 
   const storageKey = `${dateKey}-${label}`;
   let isChoosingSuggestion = false;
+  let activeSuggestionIndex = -1;
+  let currentSuggestions = [];
 
   const autocomplete = document.createElement('div');
   autocomplete.className = 'meal__autocomplete';
@@ -198,6 +200,8 @@ function createMealRow(label, dateKey) {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
       autocomplete.hidden = true;
+      currentSuggestions = [];
+      activeSuggestionIndex = -1;
       return;
     }
     const matches = suggestionsCache.filter((item) =>
@@ -205,8 +209,12 @@ function createMealRow(label, dateKey) {
     );
     if (!matches.length) {
       autocomplete.hidden = true;
+      currentSuggestions = [];
+      activeSuggestionIndex = -1;
       return;
     }
+    currentSuggestions = matches;
+    activeSuggestionIndex = -1;
     matches.forEach((item) => {
       const option = document.createElement('button');
       option.type = 'button';
@@ -253,10 +261,42 @@ function createMealRow(label, dateKey) {
   input.addEventListener('input', () => {
     renderAutocomplete(input.value);
   });
+  const highlightSuggestion = () => {
+    const items = autocomplete.querySelectorAll('.meal__suggestion');
+    items.forEach((item, index) => {
+      if (index === activeSuggestionIndex) {
+        item.classList.add('meal__suggestion--active');
+        item.scrollIntoView({ block: 'nearest' });
+      } else {
+        item.classList.remove('meal__suggestion--active');
+      }
+    });
+  };
+
   input.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!currentSuggestions.length) {
+        return;
+      }
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = activeSuggestionIndex + direction;
+      const maxIndex = currentSuggestions.length - 1;
+      if (nextIndex < 0) {
+        activeSuggestionIndex = maxIndex;
+      } else if (nextIndex > maxIndex) {
+        activeSuggestionIndex = 0;
+      } else {
+        activeSuggestionIndex = nextIndex;
+      }
+      highlightSuggestion();
+      return;
+    }
     if (event.key === 'Enter') {
       event.preventDefault();
-      const suggestion = getBestSuggestion(input.value);
+      const selected =
+        activeSuggestionIndex >= 0 ? currentSuggestions[activeSuggestionIndex] : null;
+      const suggestion = selected || getBestSuggestion(input.value);
       if (suggestion && suggestion.value && input.value.trim() !== '') {
         input.value = suggestion.value;
       }
@@ -401,6 +441,8 @@ if (dayContainer) {
   let touchStartY = 0;
   let isSwiping = false;
   let lastSwipeTime = 0;
+  let dragOffsetX = 0;
+  let isDragging = false;
 
   dayContainer.addEventListener(
     'touchstart',
@@ -411,6 +453,9 @@ if (dayContainer) {
       touchStartX = event.changedTouches[0].screenX;
       touchStartY = event.changedTouches[0].screenY;
       isSwiping = true;
+      isDragging = true;
+      dragOffsetX = 0;
+      dayContainer.style.transition = 'none';
     },
     { passive: true }
   );
@@ -422,6 +467,13 @@ if (dayContainer) {
         return;
       }
       touchEndX = event.changedTouches[0].screenX;
+      const currentY = event.changedTouches[0].screenY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = currentY - touchStartY;
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        dragOffsetX = deltaX;
+        dayContainer.style.transform = `translateX(${deltaX}px)`;
+      }
     },
     { passive: true }
   );
@@ -434,7 +486,10 @@ if (dayContainer) {
       }
       const now = Date.now();
       if (now - lastSwipeTime < 250) {
+        dayContainer.style.transition = 'transform 0.2s ease';
+        dayContainer.style.transform = 'translateX(0px)';
         isSwiping = false;
+        isDragging = false;
         return;
       }
       touchEndX = event.changedTouches[0].screenX;
@@ -443,9 +498,14 @@ if (dayContainer) {
       const deltaY = touchEndY - touchStartY;
       const threshold = 50;
       if (Math.abs(deltaX) < threshold || Math.abs(deltaX) < Math.abs(deltaY)) {
+        dayContainer.style.transition = 'transform 0.2s ease';
+        dayContainer.style.transform = 'translateX(0px)';
         isSwiping = false;
+        isDragging = false;
         return;
       }
+      dayContainer.style.transition = 'transform 0.2s ease';
+      dayContainer.style.transform = `translateX(${deltaX > 0 ? 40 : -40}px)`;
       if (deltaX > 0) {
         startOffset -= calculateSlots();
       } else {
@@ -454,6 +514,11 @@ if (dayContainer) {
       renderDays();
       lastSwipeTime = now;
       isSwiping = false;
+      isDragging = false;
+      window.setTimeout(() => {
+        dayContainer.style.transition = 'transform 0.25s ease';
+        dayContainer.style.transform = 'translateX(0px)';
+      }, 50);
     },
     { passive: true }
   );

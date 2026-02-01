@@ -279,6 +279,11 @@ body {
   outline: none;
 }
 
+.meal__suggestion--active {
+  background: #dfead8;
+  transform: translateX(2px);
+}
+
 .meal__suggestion mark {
   background: #d9ead2;
   color: var(--text);
