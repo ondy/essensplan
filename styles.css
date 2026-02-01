@@ -121,6 +121,11 @@ body {
   padding-bottom: 8px;
   scroll-snap-type: x mandatory;
   touch-action: pan-x;
+  scrollbar-width: none;
+}
+
+.days::-webkit-scrollbar {
+  display: none;
 }
 
 .day-card {
