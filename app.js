@@ -195,20 +195,22 @@ function createMealRow(label, dateKey) {
 
   const renderAutocomplete = (query) => {
     autocomplete.innerHTML = '';
-    if (!suggestionsCache.length) {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
       autocomplete.hidden = true;
       return;
     }
-    suggestionsCache.forEach((item) => {
+    const matches = suggestionsCache.filter((item) =>
+      item.value.toLowerCase().includes(trimmedQuery.toLowerCase())
+    );
+    if (!matches.length) {
+      autocomplete.hidden = true;
+      return;
+    }
+    matches.forEach((item) => {
       const option = document.createElement('button');
       option.type = 'button';
       option.className = 'meal__suggestion';
-      const match =
-        query.trim().length > 0 &&
-        item.value.toLowerCase().includes(query.trim().toLowerCase());
-      if (!match && query.trim().length > 0) {
-        option.classList.add('meal__suggestion--muted');
-      }
       option.appendChild(renderSuggestionHighlight(item.value, query));
       option.addEventListener('mousedown', () => {
         isChoosingSuggestion = true;

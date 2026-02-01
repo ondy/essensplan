@@ -276,10 +276,6 @@ body {
   outline: none;
 }
 
-.meal__suggestion--muted {
-  opacity: 0.6;
-}
-
 .meal__suggestion mark {
   background: #d9ead2;
   color: var(--text);
