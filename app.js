@@ -305,7 +305,7 @@ function createMealRow(label, dateKey) {
     }
   });
   input.addEventListener('focus', () => {
-    renderAutocomplete(input.value);
+    autocomplete.hidden = true;
   });
 
   getMealEntry(storageKey)
@@ -443,10 +443,15 @@ if (dayContainer) {
   let lastSwipeTime = 0;
   let dragOffsetX = 0;
   let isDragging = false;
+  let isAnimatingSwipe = false;
+  let swipeDirection = 0;
 
   dayContainer.addEventListener(
     'touchstart',
     (event) => {
+      if (isAnimatingSwipe) {
+        return;
+      }
       if (event.touches.length > 1) {
         return;
       }
@@ -504,21 +509,33 @@ if (dayContainer) {
         isDragging = false;
         return;
       }
-      dayContainer.style.transition = 'transform 0.2s ease';
-      dayContainer.style.transform = `translateX(${deltaX > 0 ? 40 : -40}px)`;
-      if (deltaX > 0) {
-        startOffset -= calculateSlots();
-      } else {
-        startOffset += calculateSlots();
-      }
-      renderDays();
+      swipeDirection = deltaX > 0 ? 1 : -1;
+      const containerWidth = dayContainer.clientWidth || window.innerWidth;
+      isAnimatingSwipe = true;
+      dayContainer.style.transition = 'transform 0.25s ease';
+      dayContainer.style.transform = `translateX(${swipeDirection * containerWidth}px)`;
+      const onTransitionEnd = () => {
+        dayContainer.removeEventListener('transitionend', onTransitionEnd);
+        if (swipeDirection > 0) {
+          startOffset -= calculateSlots();
+        } else {
+          startOffset += calculateSlots();
+        }
+        renderDays();
+        dayContainer.style.transition = 'none';
+        dayContainer.style.transform = `translateX(${swipeDirection * -containerWidth}px)`;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            dayContainer.style.transition = 'transform 0.25s ease';
+            dayContainer.style.transform = 'translateX(0px)';
+            isAnimatingSwipe = false;
+          });
+        });
+      };
+      dayContainer.addEventListener('transitionend', onTransitionEnd);
       lastSwipeTime = now;
       isSwiping = false;
       isDragging = false;
-      window.setTimeout(() => {
-        dayContainer.style.transition = 'transform 0.25s ease';
-        dayContainer.style.transform = 'translateX(0px)';
-      }, 50);
     },
     { passive: true }
   );
