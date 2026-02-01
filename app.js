@@ -82,9 +82,10 @@ function calculateSlots() {
   const cardWidth = parseInt(styles.getPropertyValue('--card-width'), 10);
   const cardHeight = parseInt(styles.getPropertyValue('--card-height'), 10);
   const gap = parseInt(styles.getPropertyValue('--gap'), 10);
-  const width = dayContainer.clientWidth || window.innerWidth;
-  const height = window.innerHeight;
-  const headerHeight = document.querySelector('.app__header')?.offsetHeight || 0;
+  const width = (dayContainer && dayContainer.clientWidth) || window.innerWidth;
+  const height = window.innerHeight || cardHeight;
+  const headerElement = document.querySelector('.app__header');
+  const headerHeight = headerElement ? headerElement.offsetHeight : 0;
   const availableHeight = Math.max(height - headerHeight - 140, cardHeight);
 
   const columns = Math.max(1, Math.floor((width + gap) / (cardWidth + gap)));
@@ -94,9 +95,14 @@ function calculateSlots() {
 }
 
 function renderDays() {
+  if (!dayContainer) {
+    return;
+  }
   const today = new Date();
   const todayYear = today.getFullYear();
-  todayLabel.textContent = weekdayFormatter.format(today);
+  if (todayLabel) {
+    todayLabel.textContent = weekdayFormatter.format(today);
+  }
 
   const slots = calculateSlots();
   dayContainer.innerHTML = '';
