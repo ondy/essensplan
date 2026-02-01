@@ -114,11 +114,13 @@ body {
 }
 
 .days {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--card-width), 1fr));
+  display: flex;
   gap: var(--gap);
   align-items: stretch;
-  touch-action: pan-y;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-x;
 }
 
 .day-card {
@@ -131,8 +133,10 @@ body {
   flex-direction: column;
   gap: 18px;
   min-height: var(--card-height);
+  min-width: var(--card-width);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  scroll-snap-align: start;
 }
 
 .day-card::after {
@@ -267,7 +271,7 @@ body {
   left: 0;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 9999;
+  z-index: 99999;
 }
 
 .meal__suggestion {
