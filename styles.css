@@ -188,6 +188,7 @@ body {
   transition: border 0.2s ease, transform 0.2s ease;
   flex-wrap: wrap;
   gap: 8px;
+  overflow: visible;
 }
 
 .meal:hover {
@@ -226,6 +227,11 @@ body {
   outline-offset: 2px;
 }
 
+.meal__field {
+  position: relative;
+  width: 100%;
+}
+
 .meal__input {
   width: 100%;
   border: 1px solid var(--border);
@@ -257,6 +263,11 @@ body {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--border);
   box-shadow: 0 14px 30px rgba(44, 42, 36, 0.12);
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
 }
 
 .meal__suggestion {

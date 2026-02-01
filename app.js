@@ -186,6 +186,9 @@ function createMealRow(label, dateKey) {
   input.placeholder = `${label} hinzufügen`;
   input.hidden = true;
 
+  const field = document.createElement('div');
+  field.className = 'meal__field';
+
   const storageKey = `${dateKey}-${label}`;
   let isChoosingSuggestion = false;
   let activeSuggestionIndex = -1;
@@ -268,8 +271,24 @@ function createMealRow(label, dateKey) {
     hideAutocomplete();
   });
   input.addEventListener('change', saveInput);
-  input.addEventListener('input', () => {
-    renderAutocomplete(input.value);
+  input.addEventListener('input', (event) => {
+    const current = input.value;
+    renderAutocomplete(current);
+    if (!current) {
+      return;
+    }
+    if (event && event.inputType && event.inputType.startsWith('delete')) {
+      return;
+    }
+    const suggestion = getBestSuggestion(current);
+    if (!suggestion || !suggestion.value) {
+      return;
+    }
+    if (suggestion.value.toLowerCase() === current.toLowerCase()) {
+      return;
+    }
+    input.value = suggestion.value;
+    input.setSelectionRange(current.length, suggestion.value.length);
   });
   const highlightSuggestion = () => {
     const items = autocomplete.querySelectorAll('.meal__suggestion');
@@ -327,7 +346,8 @@ function createMealRow(label, dateKey) {
     })
     .catch(() => {});
 
-  row.append(text, button, input, autocomplete);
+  field.append(input, autocomplete);
+  row.append(text, button, field);
   return row;
 }
 
