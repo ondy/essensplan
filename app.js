@@ -398,11 +398,30 @@ if (nextButton) {
 if (dayContainer) {
   let touchStartX = 0;
   let touchEndX = 0;
+  let touchStartY = 0;
+  let isSwiping = false;
+  let lastSwipeTime = 0;
 
   dayContainer.addEventListener(
     'touchstart',
     (event) => {
+      if (event.touches.length > 1) {
+        return;
+      }
       touchStartX = event.changedTouches[0].screenX;
+      touchStartY = event.changedTouches[0].screenY;
+      isSwiping = true;
+    },
+    { passive: true }
+  );
+
+  dayContainer.addEventListener(
+    'touchmove',
+    (event) => {
+      if (!isSwiping) {
+        return;
+      }
+      touchEndX = event.changedTouches[0].screenX;
     },
     { passive: true }
   );
@@ -410,18 +429,31 @@ if (dayContainer) {
   dayContainer.addEventListener(
     'touchend',
     (event) => {
-      touchEndX = event.changedTouches[0].screenX;
-      const delta = touchEndX - touchStartX;
-      const threshold = 50;
-      if (Math.abs(delta) < threshold) {
+      if (!isSwiping) {
         return;
       }
-      if (delta > 0) {
+      const now = Date.now();
+      if (now - lastSwipeTime < 250) {
+        isSwiping = false;
+        return;
+      }
+      touchEndX = event.changedTouches[0].screenX;
+      const touchEndY = event.changedTouches[0].screenY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      const threshold = 50;
+      if (Math.abs(deltaX) < threshold || Math.abs(deltaX) < Math.abs(deltaY)) {
+        isSwiping = false;
+        return;
+      }
+      if (deltaX > 0) {
         startOffset -= calculateSlots();
       } else {
         startOffset += calculateSlots();
       }
       renderDays();
+      lastSwipeTime = now;
+      isSwiping = false;
     },
     { passive: true }
   );

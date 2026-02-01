@@ -27,6 +27,7 @@ body {
   background: radial-gradient(circle at top, #faf7f1 0%, var(--bg) 45%);
   color: var(--text);
   min-height: 100vh;
+  touch-action: manipulation;
 }
 
 .app {
@@ -77,6 +78,7 @@ body {
   cursor: pointer;
   box-shadow: 0 8px 22px rgba(33, 34, 29, 0.06);
   transition: transform 0.2s ease, border-color 0.2s ease;
+  touch-action: manipulation;
 }
 
 .nav-button:hover {
@@ -116,6 +118,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(var(--card-width), 1fr));
   gap: var(--gap);
   align-items: stretch;
+  touch-action: pan-y;
 }
 
 .day-card {
@@ -298,5 +301,14 @@ body {
   .app__actions {
     width: 100%;
     justify-content: center;
+    gap: 8px;
+  }
+
+  .nav-button {
+    padding: 10px 12px;
+  }
+
+  .nav-button__label {
+    display: none;
   }
 }
