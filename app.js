@@ -187,7 +187,6 @@ function createMealRow(label, dateKey) {
   input.hidden = true;
 
   const storageKey = `${dateKey}-${label}`;
-  let isAutocompleting = false;
   let isChoosingSuggestion = false;
 
   const autocomplete = document.createElement('div');
@@ -204,6 +203,12 @@ function createMealRow(label, dateKey) {
       const option = document.createElement('button');
       option.type = 'button';
       option.className = 'meal__suggestion';
+      const match =
+        query.trim().length > 0 &&
+        item.value.toLowerCase().includes(query.trim().toLowerCase());
+      if (!match && query.trim().length > 0) {
+        option.classList.add('meal__suggestion--muted');
+      }
       option.appendChild(renderSuggestionHighlight(item.value, query));
       option.addEventListener('mousedown', () => {
         isChoosingSuggestion = true;
@@ -244,25 +249,13 @@ function createMealRow(label, dateKey) {
   });
   input.addEventListener('change', saveInput);
   input.addEventListener('input', () => {
-    if (isAutocompleting) {
-      return;
-    }
-    const current = input.value;
-    const suggestion = getBestSuggestion(current);
-    renderAutocomplete(current);
-    if (!suggestion || suggestion.value.toLowerCase() === current.toLowerCase()) {
-      return;
-    }
-    isAutocompleting = true;
-    input.value = suggestion.value;
-    input.setSelectionRange(current.length, suggestion.value.length);
-    isAutocompleting = false;
+    renderAutocomplete(input.value);
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       const suggestion = getBestSuggestion(input.value);
-      if (suggestion && suggestion.value) {
+      if (suggestion && suggestion.value && input.value.trim() !== '') {
         input.value = suggestion.value;
       }
       saveInput().catch(() => {});
