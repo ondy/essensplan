@@ -9,7 +9,8 @@ const DAYS_LABELS = {
 const meals = ['Frühstück', 'Mittagessen', 'Abendessen'];
 
 const dayContainer = document.getElementById('days');
-const todayLabel = document.getElementById('today-label');
+const prevButton = document.getElementById('prev-days');
+const nextButton = document.getElementById('next-days');
 
 const weekdayFormatter = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -45,6 +46,9 @@ function createMealRow(label) {
 function createDayCard(date, offset, todayYear) {
   const card = document.createElement('article');
   card.className = 'day-card';
+  if (offset === 0) {
+    card.classList.add('day-card--today');
+  }
 
   const header = document.createElement('div');
   header.className = 'day-card__header';
@@ -100,25 +104,37 @@ function renderDays() {
   }
   const today = new Date();
   const todayYear = today.getFullYear();
-  if (todayLabel) {
-    todayLabel.textContent = weekdayFormatter.format(today);
-  }
 
   const slots = calculateSlots();
   dayContainer.innerHTML = '';
 
   for (let i = 0; i < slots; i += 1) {
     const date = new Date(today);
-    date.setDate(today.getDate() + i);
-    const card = createDayCard(date, i, todayYear);
+    date.setDate(today.getDate() + i + startOffset);
+    const card = createDayCard(date, i + startOffset, todayYear);
     dayContainer.appendChild(card);
   }
 }
 
+let startOffset = 0;
 let resizeTimeout;
 window.addEventListener('resize', () => {
   window.clearTimeout(resizeTimeout);
   resizeTimeout = window.setTimeout(renderDays, 150);
 });
+
+if (prevButton) {
+  prevButton.addEventListener('click', () => {
+    startOffset -= calculateSlots();
+    renderDays();
+  });
+}
+
+if (nextButton) {
+  nextButton.addEventListener('click', () => {
+    startOffset += calculateSlots();
+    renderDays();
+  });
+}
 
 renderDays();

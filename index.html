@@ -11,12 +11,15 @@
       <header class="app__header">
         <div>
           <p class="app__eyebrow">Essensplanung</p>
-          <h1 class="app__title">Dein Wochenüberblick</h1>
+          <h1 class="app__title">Deine Essensplanung</h1>
         </div>
-        <div class="app__meta">
-          <span class="app__meta-label">Desktop Ansicht</span>
-          <span class="app__meta-dot"></span>
-          <span class="app__meta-label" id="today-label">Heute</span>
+        <div class="app__actions" aria-label="Tage wechseln">
+          <button class="nav-button" type="button" id="prev-days">
+            ← Vorherige Tage
+          </button>
+          <button class="nav-button nav-button--primary" type="button" id="next-days">
+            Nächste Tage →
+          </button>
         </div>
       </header>
 
