@@ -238,7 +238,6 @@ function createMealRow(label, dateKey) {
   const revealInput = () => {
     input.hidden = false;
     input.focus();
-    renderAutocomplete(input.value);
   };
 
   const saveInput = async () => {
