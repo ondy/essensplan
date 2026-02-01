@@ -183,6 +183,8 @@ body {
   padding: 10px 12px;
   border: 1px solid transparent;
   transition: border 0.2s ease, transform 0.2s ease;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .meal:hover {
@@ -219,6 +221,22 @@ body {
 .meal__button:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
+}
+
+.meal__input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.92rem;
+  background: #fff;
+  color: var(--text);
+}
+
+.meal__input:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-color: var(--accent-soft);
 }
 
 @media (max-width: 960px) {

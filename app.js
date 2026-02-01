@@ -12,10 +12,115 @@ const dayContainer = document.getElementById('days');
 const prevButton = document.getElementById('prev-days');
 const todayButton = document.getElementById('today-days');
 const nextButton = document.getElementById('next-days');
+const suggestionsListId = 'meal-suggestions';
+const hasIndexedDb = typeof indexedDB !== 'undefined';
 
 const weekdayFormatter = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
 });
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('essensplan', 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('meals')) {
+        db.createObjectStore('meals');
+      }
+      if (!db.objectStoreNames.contains('suggestions')) {
+        db.createObjectStore('suggestions');
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+const dbPromise = hasIndexedDb ? openDatabase() : null;
+let suggestionsCache = [];
+
+function ensureSuggestionsList() {
+  let list = document.getElementById(suggestionsListId);
+  if (!list) {
+    list = document.createElement('datalist');
+    list.id = suggestionsListId;
+    document.body.appendChild(list);
+  }
+  return list;
+}
+
+function updateSuggestionsList() {
+  const list = ensureSuggestionsList();
+  list.innerHTML = '';
+  suggestionsCache.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = item;
+    list.appendChild(option);
+  });
+}
+
+async function loadSuggestions() {
+  if (!dbPromise) {
+    return;
+  }
+  const db = await dbPromise;
+  const transaction = db.transaction('suggestions', 'readonly');
+  const store = transaction.objectStore('suggestions');
+  const items = await new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+  suggestionsCache = items;
+  updateSuggestionsList();
+}
+
+async function saveSuggestion(value) {
+  if (!dbPromise) {
+    return;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return;
+  }
+  const key = trimmed.toLowerCase();
+  const db = await dbPromise;
+  const transaction = db.transaction('suggestions', 'readwrite');
+  const store = transaction.objectStore('suggestions');
+  store.put(trimmed, key);
+  if (!suggestionsCache.includes(trimmed)) {
+    suggestionsCache = [...suggestionsCache, trimmed];
+    updateSuggestionsList();
+  }
+}
+
+async function getMealEntry(key) {
+  if (!dbPromise) {
+    return '';
+  }
+  const db = await dbPromise;
+  const transaction = db.transaction('meals', 'readonly');
+  const store = transaction.objectStore('meals');
+  return new Promise((resolve, reject) => {
+    const request = store.get(key);
+    request.onsuccess = () => resolve(request.result || '');
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function setMealEntry(key, value) {
+  if (!dbPromise) {
+    return;
+  }
+  const db = await dbPromise;
+  const transaction = db.transaction('meals', 'readwrite');
+  const store = transaction.objectStore('meals');
+  if (value) {
+    store.put(value, key);
+  } else {
+    store.delete(key);
+  }
+}
 
 function formatDate(date, includeYear) {
   const day = String(date.getDate()).padStart(2, '0');
@@ -26,7 +131,13 @@ function formatDate(date, includeYear) {
   return `${day}.${month}`;
 }
 
-function createMealRow(label) {
+function getDateKey(date) {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function createMealRow(label, dateKey) {
   const row = document.createElement('div');
   row.className = 'meal';
 
@@ -40,7 +151,48 @@ function createMealRow(label) {
   button.setAttribute('aria-label', `${label} hinzufügen`);
   button.textContent = '+';
 
-  row.append(text, button);
+  const input = document.createElement('input');
+  input.className = 'meal__input';
+  input.type = 'text';
+  input.placeholder = `${label} hinzufügen`;
+  input.setAttribute('list', suggestionsListId);
+  input.hidden = true;
+
+  const storageKey = `${dateKey}-${label}`;
+
+  const revealInput = () => {
+    input.hidden = false;
+    input.focus();
+  };
+
+  const saveInput = async () => {
+    const value = input.value.trim();
+    await setMealEntry(storageKey, value);
+    if (value) {
+      await saveSuggestion(value);
+    }
+  };
+
+  button.addEventListener('click', revealInput);
+  input.addEventListener('blur', saveInput);
+  input.addEventListener('change', saveInput);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      input.blur();
+    }
+  });
+
+  getMealEntry(storageKey)
+    .then((value) => {
+      if (value) {
+        input.value = value;
+        input.hidden = false;
+      }
+    })
+    .catch(() => {});
+
+  row.append(text, button, input);
   return row;
 }
 
@@ -83,8 +235,9 @@ function createDayCard(date, offset, todayYear, todayDate) {
   header.append(title, subtitle);
   card.appendChild(header);
 
+  const dateKey = getDateKey(date);
   meals.forEach((mealLabel) => {
-    card.appendChild(createMealRow(mealLabel));
+    card.appendChild(createMealRow(mealLabel, dateKey));
   });
 
   return card;
@@ -190,3 +343,5 @@ if (dayContainer) {
 }
 
 renderDays();
+
+loadSuggestions().catch(() => {});
