@@ -194,12 +194,23 @@ function createMealRow(label, dateKey) {
   const autocomplete = document.createElement('div');
   autocomplete.className = 'meal__autocomplete';
   autocomplete.hidden = true;
+  autocomplete.style.display = 'none';
+
+  const hideAutocomplete = () => {
+    autocomplete.hidden = true;
+    autocomplete.style.display = 'none';
+  };
+
+  const showAutocomplete = () => {
+    autocomplete.hidden = false;
+    autocomplete.style.display = 'grid';
+  };
 
   const renderAutocomplete = (query) => {
     autocomplete.innerHTML = '';
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
-      autocomplete.hidden = true;
+      hideAutocomplete();
       currentSuggestions = [];
       activeSuggestionIndex = -1;
       return;
@@ -208,7 +219,7 @@ function createMealRow(label, dateKey) {
       item.value.toLowerCase().includes(trimmedQuery.toLowerCase())
     );
     if (!matches.length) {
-      autocomplete.hidden = true;
+      hideAutocomplete();
       currentSuggestions = [];
       activeSuggestionIndex = -1;
       return;
@@ -232,7 +243,7 @@ function createMealRow(label, dateKey) {
       });
       autocomplete.appendChild(option);
     });
-    autocomplete.hidden = false;
+    showAutocomplete();
   };
 
   const revealInput = () => {
@@ -254,7 +265,7 @@ function createMealRow(label, dateKey) {
       return;
     }
     saveInput().catch(() => {});
-    autocomplete.hidden = true;
+    hideAutocomplete();
   });
   input.addEventListener('change', saveInput);
   input.addEventListener('input', () => {
@@ -304,7 +315,7 @@ function createMealRow(label, dateKey) {
     }
   });
   input.addEventListener('focus', () => {
-    autocomplete.hidden = true;
+    hideAutocomplete();
   });
 
   getMealEntry(storageKey)
