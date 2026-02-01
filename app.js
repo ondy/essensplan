@@ -12,7 +12,6 @@ const dayContainer = document.getElementById('days');
 const prevButton = document.getElementById('prev-days');
 const todayButton = document.getElementById('today-days');
 const nextButton = document.getElementById('next-days');
-const suggestionsListId = 'meal-suggestions';
 const hasIndexedDb = typeof indexedDB !== 'undefined';
 
 const weekdayFormatter = new Intl.DateTimeFormat('de-DE', {
@@ -38,26 +37,6 @@ function openDatabase() {
 
 const dbPromise = hasIndexedDb ? openDatabase() : null;
 let suggestionsCache = [];
-
-function ensureSuggestionsList() {
-  let list = document.getElementById(suggestionsListId);
-  if (!list) {
-    list = document.createElement('datalist');
-    list.id = suggestionsListId;
-    document.body.appendChild(list);
-  }
-  return list;
-}
-
-function updateSuggestionsList() {
-  const list = ensureSuggestionsList();
-  list.innerHTML = '';
-  suggestionsCache.forEach((item) => {
-    const option = document.createElement('option');
-    option.value = item;
-    list.appendChild(option);
-  });
-}
 
 async function loadSuggestions() {
   await refreshSuggestionsFromMeals();
@@ -106,9 +85,24 @@ async function refreshSuggestionsFromMeals() {
     request.onerror = () => reject(request.error);
   });
 
-  const suggestions = Array.from(
-    new Set(meals.map((entry) => String(entry || '').trim()).filter(Boolean))
-  );
+  const counts = meals.reduce((acc, entry) => {
+    const value = String(entry || '').trim();
+    if (!value) {
+      return acc;
+    }
+    const key = value.toLowerCase();
+    acc[key] = acc[key]
+      ? { value: acc[key].value, count: acc[key].count + 1 }
+      : { value, count: 1 };
+    return acc;
+  }, {});
+
+  const suggestions = Object.values(counts).sort((a, b) => {
+    if (b.count !== a.count) {
+      return b.count - a.count;
+    }
+    return a.value.localeCompare(b.value, 'de', { sensitivity: 'base' });
+  });
 
   await new Promise((resolve, reject) => {
     const clearRequest = suggestionStore.clear();
@@ -116,24 +110,45 @@ async function refreshSuggestionsFromMeals() {
     clearRequest.onerror = () => reject(clearRequest.error);
   });
 
-  suggestions.forEach((value) => {
-    suggestionStore.put(value, value.toLowerCase());
+  suggestions.forEach((item) => {
+    suggestionStore.put(item, item.value.toLowerCase());
   });
 
   suggestionsCache = suggestions;
-  updateSuggestionsList();
 }
 
 function getBestSuggestion(query) {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) {
-    return '';
+    return null;
   }
   return (
     suggestionsCache.find((item) =>
-      item.toLowerCase().startsWith(trimmed)
-    ) || ''
+      item.value.toLowerCase().startsWith(trimmed)
+    ) || null
   );
+}
+
+function renderSuggestionHighlight(value, query) {
+  const container = document.createElement('span');
+  const lowerValue = value.toLowerCase();
+  const lowerQuery = query.trim().toLowerCase();
+  const matchIndex = lowerQuery ? lowerValue.indexOf(lowerQuery) : -1;
+
+  if (matchIndex === -1) {
+    container.textContent = value;
+    return container;
+  }
+
+  const before = document.createTextNode(value.slice(0, matchIndex));
+  const match = document.createElement('mark');
+  match.textContent = value.slice(matchIndex, matchIndex + lowerQuery.length);
+  const after = document.createTextNode(
+    value.slice(matchIndex + lowerQuery.length)
+  );
+
+  container.append(before, match, after);
+  return container;
 }
 
 function formatDate(date, includeYear) {
@@ -169,15 +184,46 @@ function createMealRow(label, dateKey) {
   input.className = 'meal__input';
   input.type = 'text';
   input.placeholder = `${label} hinzufügen`;
-  input.setAttribute('list', suggestionsListId);
   input.hidden = true;
 
   const storageKey = `${dateKey}-${label}`;
   let isAutocompleting = false;
+  let isChoosingSuggestion = false;
+
+  const autocomplete = document.createElement('div');
+  autocomplete.className = 'meal__autocomplete';
+  autocomplete.hidden = true;
+
+  const renderAutocomplete = (query) => {
+    autocomplete.innerHTML = '';
+    if (!suggestionsCache.length) {
+      autocomplete.hidden = true;
+      return;
+    }
+    suggestionsCache.forEach((item) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'meal__suggestion';
+      option.appendChild(renderSuggestionHighlight(item.value, query));
+      option.addEventListener('mousedown', () => {
+        isChoosingSuggestion = true;
+      });
+      option.addEventListener('click', () => {
+        input.value = item.value;
+        saveInput().catch(() => {});
+        input.focus();
+        autocomplete.hidden = true;
+        isChoosingSuggestion = false;
+      });
+      autocomplete.appendChild(option);
+    });
+    autocomplete.hidden = false;
+  };
 
   const revealInput = () => {
     input.hidden = false;
     input.focus();
+    renderAutocomplete(input.value);
   };
 
   const saveInput = async () => {
@@ -187,7 +233,15 @@ function createMealRow(label, dateKey) {
   };
 
   button.addEventListener('click', revealInput);
-  input.addEventListener('blur', saveInput);
+  input.addEventListener('blur', () => {
+    if (isChoosingSuggestion) {
+      isChoosingSuggestion = false;
+      input.focus();
+      return;
+    }
+    saveInput().catch(() => {});
+    autocomplete.hidden = true;
+  });
   input.addEventListener('change', saveInput);
   input.addEventListener('input', () => {
     if (isAutocompleting) {
@@ -195,20 +249,28 @@ function createMealRow(label, dateKey) {
     }
     const current = input.value;
     const suggestion = getBestSuggestion(current);
-    if (!suggestion || suggestion.toLowerCase() === current.toLowerCase()) {
+    renderAutocomplete(current);
+    if (!suggestion || suggestion.value.toLowerCase() === current.toLowerCase()) {
       return;
     }
     isAutocompleting = true;
-    input.value = suggestion;
-    input.setSelectionRange(current.length, suggestion.length);
+    input.value = suggestion.value;
+    input.setSelectionRange(current.length, suggestion.value.length);
     isAutocompleting = false;
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
+      const suggestion = getBestSuggestion(input.value);
+      if (suggestion && suggestion.value) {
+        input.value = suggestion.value;
+      }
       saveInput().catch(() => {});
       input.blur();
     }
+  });
+  input.addEventListener('focus', () => {
+    renderAutocomplete(input.value);
   });
 
   getMealEntry(storageKey)
@@ -220,7 +282,7 @@ function createMealRow(label, dateKey) {
     })
     .catch(() => {});
 
-  row.append(text, button, input);
+  row.append(text, button, input, autocomplete);
   return row;
 }
 

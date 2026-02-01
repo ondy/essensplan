@@ -245,6 +245,45 @@ body {
   transform: translateY(-1px);
 }
 
+.meal__autocomplete {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 30px rgba(44, 42, 36, 0.12);
+}
+
+.meal__suggestion {
+  appearance: none;
+  border: none;
+  background: var(--surface-alt);
+  color: var(--text);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.meal__suggestion:hover,
+.meal__suggestion:focus-visible {
+  background: #e7efe3;
+  transform: translateX(2px);
+  outline: none;
+}
+
+.meal__suggestion mark {
+  background: #d9ead2;
+  color: var(--text);
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 4px;
+}
+
 @media (max-width: 960px) {
   :root {
     --card-width: 240px;
