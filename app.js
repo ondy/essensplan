@@ -124,6 +124,18 @@ async function refreshSuggestionsFromMeals() {
   updateSuggestionsList();
 }
 
+function getBestSuggestion(query) {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) {
+    return '';
+  }
+  return (
+    suggestionsCache.find((item) =>
+      item.toLowerCase().startsWith(trimmed)
+    ) || ''
+  );
+}
+
 function formatDate(date, includeYear) {
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -161,6 +173,7 @@ function createMealRow(label, dateKey) {
   input.hidden = true;
 
   const storageKey = `${dateKey}-${label}`;
+  let isAutocompleting = false;
 
   const revealInput = () => {
     input.hidden = false;
@@ -176,6 +189,20 @@ function createMealRow(label, dateKey) {
   button.addEventListener('click', revealInput);
   input.addEventListener('blur', saveInput);
   input.addEventListener('change', saveInput);
+  input.addEventListener('input', () => {
+    if (isAutocompleting) {
+      return;
+    }
+    const current = input.value;
+    const suggestion = getBestSuggestion(current);
+    if (!suggestion || suggestion.toLowerCase() === current.toLowerCase()) {
+      return;
+    }
+    isAutocompleting = true;
+    input.value = suggestion;
+    input.setSelectionRange(current.length, suggestion.length);
+    isAutocompleting = false;
+  });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
