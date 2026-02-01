@@ -95,9 +95,9 @@ function calculateSlots() {
     return 1;
   }
   const styles = getComputedStyle(document.documentElement);
-  const cardWidth = parseInt(styles.getPropertyValue('--card-width'), 10);
-  const cardHeight = parseInt(styles.getPropertyValue('--card-height'), 10);
-  const gap = parseInt(styles.getPropertyValue('--gap'), 10);
+  const cardWidth = parseInt(styles.getPropertyValue('--card-width'), 10) || 280;
+  const cardHeight = parseInt(styles.getPropertyValue('--card-height'), 10) || 260;
+  const gap = parseInt(styles.getPropertyValue('--gap'), 10) || 20;
   const width = (dayContainer && dayContainer.clientWidth) || window.innerWidth;
   const height = window.innerHeight || cardHeight;
   const headerElement = document.querySelector('.app__header');
