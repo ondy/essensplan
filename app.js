@@ -60,38 +60,7 @@ function updateSuggestionsList() {
 }
 
 async function loadSuggestions() {
-  if (!dbPromise) {
-    return;
-  }
-  const db = await dbPromise;
-  const transaction = db.transaction('suggestions', 'readonly');
-  const store = transaction.objectStore('suggestions');
-  const items = await new Promise((resolve, reject) => {
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
-  suggestionsCache = items;
-  updateSuggestionsList();
-}
-
-async function saveSuggestion(value) {
-  if (!dbPromise) {
-    return;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return;
-  }
-  const key = trimmed.toLowerCase();
-  const db = await dbPromise;
-  const transaction = db.transaction('suggestions', 'readwrite');
-  const store = transaction.objectStore('suggestions');
-  store.put(trimmed, key);
-  if (!suggestionsCache.includes(trimmed)) {
-    suggestionsCache = [...suggestionsCache, trimmed];
-    updateSuggestionsList();
-  }
+  await refreshSuggestionsFromMeals();
 }
 
 async function getMealEntry(key) {
@@ -120,6 +89,39 @@ async function setMealEntry(key, value) {
   } else {
     store.delete(key);
   }
+}
+
+async function refreshSuggestionsFromMeals() {
+  if (!dbPromise) {
+    return;
+  }
+  const db = await dbPromise;
+  const transaction = db.transaction(['meals', 'suggestions'], 'readwrite');
+  const mealStore = transaction.objectStore('meals');
+  const suggestionStore = transaction.objectStore('suggestions');
+
+  const meals = await new Promise((resolve, reject) => {
+    const request = mealStore.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+
+  const suggestions = Array.from(
+    new Set(meals.map((entry) => String(entry || '').trim()).filter(Boolean))
+  );
+
+  await new Promise((resolve, reject) => {
+    const clearRequest = suggestionStore.clear();
+    clearRequest.onsuccess = () => resolve();
+    clearRequest.onerror = () => reject(clearRequest.error);
+  });
+
+  suggestions.forEach((value) => {
+    suggestionStore.put(value, value.toLowerCase());
+  });
+
+  suggestionsCache = suggestions;
+  updateSuggestionsList();
 }
 
 function formatDate(date, includeYear) {
@@ -168,9 +170,7 @@ function createMealRow(label, dateKey) {
   const saveInput = async () => {
     const value = input.value.trim();
     await setMealEntry(storageKey, value);
-    if (value) {
-      await saveSuggestion(value);
-    }
+    await refreshSuggestionsFromMeals();
   };
 
   button.addEventListener('click', revealInput);
@@ -179,6 +179,7 @@ function createMealRow(label, dateKey) {
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
+      saveInput().catch(() => {});
       input.blur();
     }
   });
