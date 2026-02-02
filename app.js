@@ -176,6 +176,16 @@ function formatDate(date, includeYear) {
   return `${day}.${month}`;
 }
 
+function getMeasuredTextWidth(text, font) {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return 0;
+  }
+  context.font = font;
+  return context.measureText(text).width;
+}
+
 function getDateKey(date) {
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -227,6 +237,67 @@ async function countWeeklyBonusRatings(weekKey) {
   });
 }
 
+let requestedCardWidth = null;
+
+let resizeHandle;
+
+function updateCardWidthFromContent() {
+  if (!dayContainer) {
+    return;
+  }
+  const styles = getComputedStyle(document.documentElement);
+  const minWidth =
+    parseInt(styles.getPropertyValue('--card-width'), 10) || 280;
+  const gap = parseInt(styles.getPropertyValue('--gap'), 10) || 20;
+  const availableWidth = dayContainer.clientWidth || window.innerWidth;
+  let activeSlots = calculateSlotsForWidth(minWidth);
+  const maxWidth =
+    activeSlots > 1
+      ? Math.floor((availableWidth - gap * (activeSlots - 1)) / activeSlots)
+      : availableWidth;
+  const requiredWidth = getRequiredCardWidth();
+  let nextWidth = minWidth;
+
+  if (requiredWidth) {
+    nextWidth = Math.max(minWidth, Math.min(requiredWidth, maxWidth));
+  }
+
+  const nextSlots = calculateSlotsForWidth(nextWidth);
+  if (nextSlots !== activeSlots) {
+    activeSlots = nextSlots;
+    const newMaxWidth =
+      activeSlots > 1
+        ? Math.floor((availableWidth - gap * (activeSlots - 1)) / activeSlots)
+        : availableWidth;
+    if (requiredWidth) {
+      nextWidth = Math.max(minWidth, Math.min(requiredWidth, newMaxWidth));
+    } else {
+      nextWidth = Math.min(nextWidth, newMaxWidth);
+    }
+  }
+
+  if (requestedCardWidth !== nextWidth) {
+    requestedCardWidth = nextWidth;
+    document.documentElement.style.setProperty('--card-width', `${nextWidth}px`);
+    renderDays();
+  }
+}
+
+function scheduleCardWidthUpdate() {
+  window.clearTimeout(resizeHandle);
+  resizeHandle = window.setTimeout(updateCardWidthFromContent, 100);
+}
+
+function calculateSlotsForWidth(cardWidth) {
+  if (window.innerWidth && window.innerWidth <= 640) {
+    return 1;
+  }
+  const styles = getComputedStyle(document.documentElement);
+  const gap = parseInt(styles.getPropertyValue('--gap'), 10) || 20;
+  const width = (dayContainer && dayContainer.clientWidth) || window.innerWidth;
+  return Math.max(1, Math.floor((width + gap) / (cardWidth + gap)));
+}
+
 function createMealRow(label, dateKey) {
   const row = document.createElement('div');
   row.className = 'meal';
@@ -264,6 +335,7 @@ function createMealRow(label, dateKey) {
       .filter(Boolean);
     await setMealEntry(storageKey, values);
     await refreshSuggestionsFromMeals();
+    scheduleCardWidthUpdate();
   };
 
   const removeEmptyEntry = (entry) => {
@@ -294,7 +366,7 @@ function createMealRow(label, dateKey) {
     ratingButton.type = 'button';
     ratingButton.className = 'meal__rating';
     ratingButton.setAttribute('aria-label', 'Mahlzeit bewerten');
-    ratingButton.textContent = '👍';
+    ratingButton.textContent = initialRating < 0 ? '👎' : '👍';
 
     const ratingBadge = document.createElement('span');
     ratingBadge.className = 'meal__rating-value';
@@ -307,13 +379,14 @@ function createMealRow(label, dateKey) {
 
     const ratingOptions = [
       { value: 1, label: 'Daumen hoch', icon: '👍' },
-      { value: 2, label: 'Zwei Daumen hoch', icon: '👍👍' },
+      { value: 2, label: 'Zwei Daumen hoch', icon: '👍', double: true },
       { value: -1, label: 'Daumen runter', icon: '👎' },
     ];
 
     const updateRatingDisplay = (value) => {
       entry.dataset.rating = String(value);
       ratingBadge.textContent = value ? String(value) : '';
+      ratingButton.textContent = value < 0 ? '👎' : '👍';
     };
 
     const updateBonusState = async () => {
@@ -338,7 +411,13 @@ function createMealRow(label, dateKey) {
       button.type = 'button';
       button.className = 'meal__rating-option';
       button.dataset.rating = String(option.value);
-      button.innerHTML = `<span class="meal__rating-icon">${option.icon}</span><span class="meal__rating-text">${option.label}</span>`;
+      if (option.double) {
+        button.innerHTML =
+          '<span class="meal__rating-stack"><span class="meal__rating-icon">👍</span><span class="meal__rating-icon meal__rating-icon--offset">👍</span></span>';
+      } else {
+        button.innerHTML = `<span class="meal__rating-icon">${option.icon}</span>`;
+      }
+      button.setAttribute('aria-label', option.label);
       button.addEventListener('click', async () => {
         if (option.value === 2) {
           const usedCount = await countWeeklyBonusRatings(weekKey);
@@ -536,6 +615,7 @@ function createMealRow(label, dateKey) {
           createMealInput(String(value || '').trim());
         }
       });
+      scheduleCardWidthUpdate();
     })
     .catch(() => {});
 
@@ -592,15 +672,56 @@ function createDayCard(date, offset, todayYear, todayDate) {
 }
 
 function calculateSlots() {
-  if (window.innerWidth && window.innerWidth <= 640) {
-    return 1;
-  }
   const styles = getComputedStyle(document.documentElement);
-  const cardWidth = parseInt(styles.getPropertyValue('--card-width'), 10) || 280;
-  const gap = parseInt(styles.getPropertyValue('--gap'), 10) || 20;
-  const width = (dayContainer && dayContainer.clientWidth) || window.innerWidth;
-  const columns = Math.max(1, Math.floor((width + gap) / (cardWidth + gap)));
-  return columns;
+  const minWidth =
+    parseInt(styles.getPropertyValue('--card-width'), 10) || 280;
+  return calculateSlotsForWidth(minWidth);
+}
+
+function getRequiredCardWidth() {
+  if (!dayContainer) {
+    return null;
+  }
+  const input = dayContainer.querySelector('.meal__input');
+  const label = dayContainer.querySelector('.meal__label');
+  const title = dayContainer.querySelector('.day-card__title');
+  const inputFont = input ? getComputedStyle(input).font : '16px system-ui';
+  const labelFont = label ? getComputedStyle(label).font : inputFont;
+  const titleFont = title ? getComputedStyle(title).font : inputFont;
+  let maxTextWidth = 0;
+
+  dayContainer.querySelectorAll('.meal__input').forEach((item) => {
+    if (item.value) {
+      maxTextWidth = Math.max(
+        maxTextWidth,
+        getMeasuredTextWidth(item.value, inputFont)
+      );
+    }
+  });
+  dayContainer.querySelectorAll('.meal__label').forEach((item) => {
+    maxTextWidth = Math.max(
+      maxTextWidth,
+      getMeasuredTextWidth(item.textContent || '', labelFont)
+    );
+  });
+  dayContainer.querySelectorAll('.day-card__title').forEach((item) => {
+    maxTextWidth = Math.max(
+      maxTextWidth,
+      getMeasuredTextWidth(item.textContent || '', titleFont)
+    );
+  });
+
+  if (!maxTextWidth) {
+    return null;
+  }
+
+  const ratingButtonWidth = 38;
+  const inputPadding = 24;
+  const entryGap = 10;
+  const cardPadding = 40;
+  return Math.ceil(
+    maxTextWidth + ratingButtonWidth + inputPadding + entryGap + cardPadding
+  );
 }
 
 function renderDays() {
@@ -620,6 +741,8 @@ function renderDays() {
     const card = createDayCard(date, offsetFromToday, todayYear, today);
     dayContainer.appendChild(card);
   }
+
+  window.requestAnimationFrame(updateCardWidthFromContent);
 }
 
 let startOffset = 0;
