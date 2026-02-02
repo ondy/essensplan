@@ -184,6 +184,9 @@ function createMealRow(label, dateKey) {
   const row = document.createElement('div');
   row.className = 'meal';
 
+  const header = document.createElement('div');
+  header.className = 'meal__header';
+
   const text = document.createElement('span');
   text.className = 'meal__label';
   text.textContent = label;
@@ -385,8 +388,11 @@ function createMealRow(label, dateKey) {
     revealInput();
   };
 
-  button.addEventListener('click', addNewInput);
-  text.addEventListener('click', addNewInput);
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    addNewInput();
+  });
+  header.addEventListener('click', addNewInput);
 
   getMealEntry(storageKey)
     .then((values) => {
@@ -396,7 +402,8 @@ function createMealRow(label, dateKey) {
     })
     .catch(() => {});
 
-  row.append(text, button, field);
+  header.append(text, button);
+  row.append(header, field);
   return row;
 }
 

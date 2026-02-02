@@ -168,16 +168,23 @@ body {
 
 .meal {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   background: var(--surface-alt);
   border-radius: 14px;
   padding: 10px 12px;
   border: 1px solid transparent;
   transition: border 0.2s ease, transform 0.2s ease;
-  flex-wrap: wrap;
   gap: 8px;
   overflow: visible;
+}
+
+.meal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
 }
 
 .meal:hover {
