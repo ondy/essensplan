@@ -331,7 +331,8 @@ body {
 }
 
 .meal__entry:hover .meal__rating-menu,
-.meal__entry:focus-within .meal__rating-menu {
+.meal__entry:focus-within .meal__rating-menu,
+.meal__entry--menu-open .meal__rating-menu {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;

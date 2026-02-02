@@ -383,6 +383,14 @@ function createMealRow(label, dateKey) {
       { value: -1, label: 'Daumen runter', icon: '👎' },
     ];
 
+    const openMenu = () => {
+      entry.classList.add('meal__entry--menu-open');
+    };
+
+    const closeMenu = () => {
+      entry.classList.remove('meal__entry--menu-open');
+    };
+
     const updateRatingDisplay = (value) => {
       entry.dataset.rating = String(value);
       ratingBadge.textContent = value ? String(value) : '';
@@ -439,10 +447,21 @@ function createMealRow(label, dateKey) {
       updateRatingDisplay(nextValue);
       saveInputs().catch(() => {});
       updateBonusState().catch(() => {});
+      openMenu();
     });
 
     entry.addEventListener('mouseenter', () => {
       updateBonusState().catch(() => {});
+    });
+    entry.addEventListener('mouseenter', openMenu);
+    entry.addEventListener('mouseleave', closeMenu);
+    entry.addEventListener('focusin', openMenu);
+    ratingMenu.addEventListener('mouseenter', openMenu);
+    ratingMenu.addEventListener('mouseleave', closeMenu);
+    document.addEventListener('click', (event) => {
+      if (!entry.contains(event.target)) {
+        closeMenu();
+      }
     });
 
     row.append(input, ratingButton);
