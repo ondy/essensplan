@@ -99,7 +99,9 @@ async function refreshSuggestionsFromMeals() {
   const counts = meals.reduce((acc, entry) => {
     const values = Array.isArray(entry) ? entry : [entry];
     values.forEach((item) => {
-      const value = String(item || '').trim();
+      const rawValue =
+        item && typeof item === 'object' ? item.text : item;
+      const value = String(rawValue || '').trim();
       if (!value) {
         return;
       }
@@ -180,6 +182,51 @@ function getDateKey(date) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function getWeekKeyFromDateKey(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const dayOfWeek = (date.getDay() + 6) % 7;
+  const thursday = new Date(date);
+  thursday.setDate(date.getDate() - dayOfWeek + 3);
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4);
+  const firstDayOfWeek = (firstThursday.getDay() + 6) % 7;
+  firstThursday.setDate(firstThursday.getDate() - firstDayOfWeek + 3);
+  const weekNumber =
+    1 +
+    Math.round(
+      (thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000)
+    );
+  return `${thursday.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+}
+
+async function countWeeklyBonusRatings(weekKey) {
+  if (!dbPromise) {
+    return 0;
+  }
+  const db = await dbPromise;
+  const transaction = db.transaction('meals', 'readonly');
+  const store = transaction.objectStore('meals');
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const entries = request.result || [];
+      const count = entries.reduce((acc, entry) => {
+        const values = Array.isArray(entry) ? entry : [entry];
+        values.forEach((item) => {
+          if (item && typeof item === 'object' && item.rating === 2) {
+            if (item.weekKey === weekKey) {
+              acc += 1;
+            }
+          }
+        });
+        return acc;
+      }, 0);
+      resolve(count);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
 function createMealRow(label, dateKey) {
   const row = document.createElement('div');
   row.className = 'meal';
@@ -197,20 +244,24 @@ function createMealRow(label, dateKey) {
   button.setAttribute('aria-label', `${label} hinzufügen`);
   button.textContent = '+';
 
-  const input = document.createElement('input');
-  input.className = 'meal__input';
-  input.type = 'text';
-  input.placeholder = `${label} hinzufügen`;
-  input.hidden = true;
-
   const field = document.createElement('div');
   field.className = 'meal__field';
 
   const storageKey = `${dateKey}-${label}`;
+  const weekKey = getWeekKeyFromDateKey(dateKey);
+
   const saveInputs = async () => {
-    const values = Array.from(field.querySelectorAll('.meal__input'))
-      .map((item) => item.value.trim())
-      .filter((value) => value.length);
+    const values = Array.from(field.querySelectorAll('.meal__entry'))
+      .map((entry) => {
+        const input = entry.querySelector('.meal__input');
+        const trimmed = input ? input.value.trim() : '';
+        if (!trimmed) {
+          return null;
+        }
+        const rating = Number(entry.dataset.rating || '0');
+        return { text: trimmed, rating, weekKey };
+      })
+      .filter(Boolean);
     await setMealEntry(storageKey, values);
     await refreshSuggestionsFromMeals();
   };
@@ -220,13 +271,17 @@ function createMealRow(label, dateKey) {
     saveInputs().catch(() => {});
   };
 
-  const createMealInput = (initialValue = '') => {
+  const createMealInput = (initialValue = '', initialRating = 0) => {
     let isChoosingSuggestion = false;
     let activeSuggestionIndex = -1;
     let currentSuggestions = [];
 
     const entry = document.createElement('div');
     entry.className = 'meal__entry';
+    entry.dataset.rating = String(initialRating);
+
+    const row = document.createElement('div');
+    row.className = 'meal__entry-row';
 
     const input = document.createElement('input');
     input.className = 'meal__input';
@@ -234,6 +289,84 @@ function createMealRow(label, dateKey) {
     input.placeholder = `${label} hinzufügen`;
     input.value = initialValue;
     input.hidden = !initialValue;
+
+    const ratingButton = document.createElement('button');
+    ratingButton.type = 'button';
+    ratingButton.className = 'meal__rating';
+    ratingButton.setAttribute('aria-label', 'Mahlzeit bewerten');
+    ratingButton.textContent = '👍';
+
+    const ratingBadge = document.createElement('span');
+    ratingBadge.className = 'meal__rating-value';
+    ratingBadge.textContent = initialRating ? String(initialRating) : '';
+    ratingButton.appendChild(ratingBadge);
+
+    const ratingMenu = document.createElement('div');
+    ratingMenu.className = 'meal__rating-menu';
+    ratingMenu.setAttribute('role', 'menu');
+
+    const ratingOptions = [
+      { value: 1, label: 'Daumen hoch', icon: '👍' },
+      { value: 2, label: 'Zwei Daumen hoch', icon: '👍👍' },
+      { value: -1, label: 'Daumen runter', icon: '👎' },
+    ];
+
+    const updateRatingDisplay = (value) => {
+      entry.dataset.rating = String(value);
+      ratingBadge.textContent = value ? String(value) : '';
+    };
+
+    const updateBonusState = async () => {
+      const usedCount = await countWeeklyBonusRatings(weekKey);
+      const remaining = Math.max(0, 2 - usedCount);
+      ratingMenu.querySelectorAll('[data-rating="2"]').forEach((option) => {
+        const shouldDisable =
+          Number(entry.dataset.rating) !== 2 && remaining <= 0;
+        option.disabled = shouldDisable;
+        option.setAttribute(
+          'aria-disabled',
+          shouldDisable ? 'true' : 'false'
+        );
+        option.title = shouldDisable
+          ? 'Zwei Daumen hoch ist diese Woche ausgeschöpft'
+          : 'Zwei Daumen hoch (+2)';
+      });
+    };
+
+    ratingOptions.forEach((option) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'meal__rating-option';
+      button.dataset.rating = String(option.value);
+      button.innerHTML = `<span class="meal__rating-icon">${option.icon}</span><span class="meal__rating-text">${option.label}</span>`;
+      button.addEventListener('click', async () => {
+        if (option.value === 2) {
+          const usedCount = await countWeeklyBonusRatings(weekKey);
+          if (Number(entry.dataset.rating) !== 2 && usedCount >= 2) {
+            return;
+          }
+        }
+        updateRatingDisplay(option.value);
+        saveInputs().catch(() => {});
+        updateBonusState().catch(() => {});
+      });
+      ratingMenu.appendChild(button);
+    });
+
+    ratingButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const currentValue = Number(entry.dataset.rating);
+      const nextValue = currentValue === 1 ? 0 : 1;
+      updateRatingDisplay(nextValue);
+      saveInputs().catch(() => {});
+      updateBonusState().catch(() => {});
+    });
+
+    entry.addEventListener('mouseenter', () => {
+      updateBonusState().catch(() => {});
+    });
+
+    row.append(input, ratingButton);
 
     const autocomplete = document.createElement('div');
     autocomplete.className = 'meal__autocomplete';
@@ -378,7 +511,7 @@ function createMealRow(label, dateKey) {
       hideAutocomplete();
     });
 
-    entry.append(input, autocomplete);
+    entry.append(row, autocomplete, ratingMenu);
     field.appendChild(entry);
     return { input, revealInput };
   };
@@ -397,7 +530,11 @@ function createMealRow(label, dateKey) {
   getMealEntry(storageKey)
     .then((values) => {
       values.forEach((value) => {
-        createMealInput(value);
+        if (value && typeof value === 'object') {
+          createMealInput(value.text || '', value.rating || 0);
+        } else {
+          createMealInput(String(value || '').trim());
+        }
       });
     })
     .catch(() => {});
