@@ -220,6 +220,14 @@ body {
   position: relative;
   width: 100%;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meal__entry {
+  position: relative;
+  width: 100%;
 }
 
 .meal__input {

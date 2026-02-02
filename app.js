@@ -44,14 +44,25 @@ async function loadSuggestions() {
 
 async function getMealEntry(key) {
   if (!dbPromise) {
-    return '';
+    return [];
   }
   const db = await dbPromise;
   const transaction = db.transaction('meals', 'readonly');
   const store = transaction.objectStore('meals');
   return new Promise((resolve, reject) => {
     const request = store.get(key);
-    request.onsuccess = () => resolve(request.result || '');
+    request.onsuccess = () => {
+      const result = request.result;
+      if (Array.isArray(result)) {
+        resolve(result);
+        return;
+      }
+      if (typeof result === 'string' && result.trim()) {
+        resolve([result.trim()]);
+        return;
+      }
+      resolve([]);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -63,7 +74,7 @@ async function setMealEntry(key, value) {
   const db = await dbPromise;
   const transaction = db.transaction('meals', 'readwrite');
   const store = transaction.objectStore('meals');
-  if (value) {
+  if (value && value.length) {
     store.put(value, key);
   } else {
     store.delete(key);
@@ -86,14 +97,17 @@ async function refreshSuggestionsFromMeals() {
   });
 
   const counts = meals.reduce((acc, entry) => {
-    const value = String(entry || '').trim();
-    if (!value) {
-      return acc;
-    }
-    const key = value.toLowerCase();
-    acc[key] = acc[key]
-      ? { value: acc[key].value, count: acc[key].count + 1 }
-      : { value, count: 1 };
+    const values = Array.isArray(entry) ? entry : [entry];
+    values.forEach((item) => {
+      const value = String(item || '').trim();
+      if (!value) {
+        return;
+      }
+      const key = value.toLowerCase();
+      acc[key] = acc[key]
+        ? { value: acc[key].value, count: acc[key].count + 1 }
+        : { value, count: 1 };
+    });
     return acc;
   }, {});
 
@@ -190,163 +204,198 @@ function createMealRow(label, dateKey) {
   field.className = 'meal__field';
 
   const storageKey = `${dateKey}-${label}`;
-  let isChoosingSuggestion = false;
-  let activeSuggestionIndex = -1;
-  let currentSuggestions = [];
-
-  const autocomplete = document.createElement('div');
-  autocomplete.className = 'meal__autocomplete';
-  autocomplete.hidden = true;
-  autocomplete.style.display = 'none';
-
-  const hideAutocomplete = () => {
-    autocomplete.hidden = true;
-    autocomplete.style.display = 'none';
-  };
-
-  const showAutocomplete = () => {
-    autocomplete.hidden = false;
-    autocomplete.style.display = 'grid';
-  };
-
-  const renderAutocomplete = (query) => {
-    autocomplete.innerHTML = '';
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery) {
-      hideAutocomplete();
-      currentSuggestions = [];
-      activeSuggestionIndex = -1;
-      return;
-    }
-    const matches = suggestionsCache.filter((item) =>
-      item.value.toLowerCase().includes(trimmedQuery.toLowerCase())
-    );
-    if (!matches.length) {
-      hideAutocomplete();
-      currentSuggestions = [];
-      activeSuggestionIndex = -1;
-      return;
-    }
-    currentSuggestions = matches;
-    activeSuggestionIndex = -1;
-    matches.forEach((item) => {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'meal__suggestion';
-      option.appendChild(renderSuggestionHighlight(item.value, query));
-      option.addEventListener('mousedown', () => {
-        isChoosingSuggestion = true;
-      });
-      option.addEventListener('click', () => {
-        input.value = item.value;
-        saveInput().catch(() => {});
-        input.focus();
-        autocomplete.hidden = true;
-        isChoosingSuggestion = false;
-      });
-      autocomplete.appendChild(option);
-    });
-    showAutocomplete();
-  };
-
-  const revealInput = () => {
-    input.hidden = false;
-    input.focus();
-  };
-
-  const saveInput = async () => {
-    const value = input.value.trim();
-    await setMealEntry(storageKey, value);
+  const saveInputs = async () => {
+    const values = Array.from(field.querySelectorAll('.meal__input'))
+      .map((item) => item.value.trim())
+      .filter((value) => value.length);
+    await setMealEntry(storageKey, values);
     await refreshSuggestionsFromMeals();
   };
 
-  button.addEventListener('click', revealInput);
-  input.addEventListener('blur', () => {
-    if (isChoosingSuggestion) {
-      isChoosingSuggestion = false;
-      input.focus();
-      return;
-    }
-    saveInput().catch(() => {});
-    hideAutocomplete();
-  });
-  input.addEventListener('change', saveInput);
-  input.addEventListener('input', (event) => {
-    const current = input.value;
-    renderAutocomplete(current);
-    if (!current) {
-      return;
-    }
-    if (event && event.inputType && event.inputType.startsWith('delete')) {
-      return;
-    }
-    const suggestion = getBestSuggestion(current);
-    if (!suggestion || !suggestion.value) {
-      return;
-    }
-    if (suggestion.value.toLowerCase() === current.toLowerCase()) {
-      return;
-    }
-    input.value = suggestion.value;
-    input.setSelectionRange(current.length, suggestion.value.length);
-  });
-  const highlightSuggestion = () => {
-    const items = autocomplete.querySelectorAll('.meal__suggestion');
-    items.forEach((item, index) => {
-      if (index === activeSuggestionIndex) {
-        item.classList.add('meal__suggestion--active');
-        item.scrollIntoView({ block: 'nearest' });
-      } else {
-        item.classList.remove('meal__suggestion--active');
-      }
-    });
+  const removeEmptyEntry = (entry) => {
+    entry.remove();
+    saveInputs().catch(() => {});
   };
 
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (!currentSuggestions.length) {
+  const createMealInput = (initialValue = '') => {
+    let isChoosingSuggestion = false;
+    let activeSuggestionIndex = -1;
+    let currentSuggestions = [];
+
+    const entry = document.createElement('div');
+    entry.className = 'meal__entry';
+
+    const input = document.createElement('input');
+    input.className = 'meal__input';
+    input.type = 'text';
+    input.placeholder = `${label} hinzufügen`;
+    input.value = initialValue;
+    input.hidden = !initialValue;
+
+    const autocomplete = document.createElement('div');
+    autocomplete.className = 'meal__autocomplete';
+    autocomplete.hidden = true;
+    autocomplete.style.display = 'none';
+
+    const hideAutocomplete = () => {
+      autocomplete.hidden = true;
+      autocomplete.style.display = 'none';
+    };
+
+    const showAutocomplete = () => {
+      autocomplete.hidden = false;
+      autocomplete.style.display = 'grid';
+    };
+
+    const renderAutocomplete = (query) => {
+      autocomplete.innerHTML = '';
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) {
+        hideAutocomplete();
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
         return;
       }
-      event.preventDefault();
-      const direction = event.key === 'ArrowDown' ? 1 : -1;
-      const nextIndex = activeSuggestionIndex + direction;
-      const maxIndex = currentSuggestions.length - 1;
-      if (nextIndex < 0) {
-        activeSuggestionIndex = maxIndex;
-      } else if (nextIndex > maxIndex) {
-        activeSuggestionIndex = 0;
-      } else {
-        activeSuggestionIndex = nextIndex;
+      const matches = suggestionsCache.filter((item) =>
+        item.value.toLowerCase().includes(trimmedQuery.toLowerCase())
+      );
+      if (!matches.length) {
+        hideAutocomplete();
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
+        return;
       }
-      highlightSuggestion();
-      return;
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const selected =
-        activeSuggestionIndex >= 0 ? currentSuggestions[activeSuggestionIndex] : null;
-      const suggestion = selected || getBestSuggestion(input.value);
-      if (suggestion && suggestion.value && input.value.trim() !== '') {
-        input.value = suggestion.value;
+      currentSuggestions = matches;
+      activeSuggestionIndex = -1;
+      matches.forEach((item) => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'meal__suggestion';
+        option.appendChild(renderSuggestionHighlight(item.value, query));
+        option.addEventListener('mousedown', () => {
+          isChoosingSuggestion = true;
+        });
+        option.addEventListener('click', () => {
+          input.value = item.value;
+          saveInputs().catch(() => {});
+          input.focus();
+          hideAutocomplete();
+          isChoosingSuggestion = false;
+        });
+        autocomplete.appendChild(option);
+      });
+      showAutocomplete();
+    };
+
+    const revealInput = () => {
+      input.hidden = false;
+      input.focus();
+    };
+
+    const highlightSuggestion = () => {
+      const items = autocomplete.querySelectorAll('.meal__suggestion');
+      items.forEach((item, index) => {
+        if (index === activeSuggestionIndex) {
+          item.classList.add('meal__suggestion--active');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('meal__suggestion--active');
+        }
+      });
+    };
+
+    input.addEventListener('blur', () => {
+      if (isChoosingSuggestion) {
+        isChoosingSuggestion = false;
+        input.focus();
+        return;
       }
-      saveInput().catch(() => {});
-      input.blur();
-    }
-  });
-  input.addEventListener('focus', () => {
-    hideAutocomplete();
-  });
+      const trimmed = input.value.trim();
+      if (!trimmed) {
+        removeEmptyEntry(entry);
+        return;
+      }
+      saveInputs().catch(() => {});
+      hideAutocomplete();
+    });
+    input.addEventListener('change', saveInputs);
+    input.addEventListener('input', (event) => {
+      const current = input.value;
+      renderAutocomplete(current);
+      if (!current) {
+        return;
+      }
+      if (event && event.inputType && event.inputType.startsWith('delete')) {
+        return;
+      }
+      const suggestion = getBestSuggestion(current);
+      if (!suggestion || !suggestion.value) {
+        return;
+      }
+      if (suggestion.value.toLowerCase() === current.toLowerCase()) {
+        return;
+      }
+      input.value = suggestion.value;
+      input.setSelectionRange(current.length, suggestion.value.length);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (!currentSuggestions.length) {
+          return;
+        }
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = activeSuggestionIndex + direction;
+        const maxIndex = currentSuggestions.length - 1;
+        if (nextIndex < 0) {
+          activeSuggestionIndex = maxIndex;
+        } else if (nextIndex > maxIndex) {
+          activeSuggestionIndex = 0;
+        } else {
+          activeSuggestionIndex = nextIndex;
+        }
+        highlightSuggestion();
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const selected =
+          activeSuggestionIndex >= 0
+            ? currentSuggestions[activeSuggestionIndex]
+            : null;
+        const suggestion = selected || getBestSuggestion(input.value);
+        if (suggestion && suggestion.value && input.value.trim() !== '') {
+          input.value = suggestion.value;
+        }
+        saveInputs().catch(() => {});
+        input.blur();
+      }
+    });
+    input.addEventListener('focus', () => {
+      hideAutocomplete();
+    });
+
+    entry.append(input, autocomplete);
+    field.appendChild(entry);
+    return { input, revealInput };
+  };
+
+  const addNewInput = () => {
+    const { revealInput } = createMealInput('');
+    revealInput();
+  };
+
+  button.addEventListener('click', addNewInput);
+  text.addEventListener('click', addNewInput);
 
   getMealEntry(storageKey)
-    .then((value) => {
-      if (value) {
-        input.value = value;
-        input.hidden = false;
-      }
+    .then((values) => {
+      values.forEach((value) => {
+        createMealInput(value);
+      });
     })
     .catch(() => {});
 
-  field.append(input, autocomplete);
   row.append(text, button, field);
   return row;
 }
