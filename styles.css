@@ -117,15 +117,7 @@ body {
   display: flex;
   gap: var(--gap);
   align-items: stretch;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  scroll-snap-type: x mandatory;
-  touch-action: pan-x;
-  scrollbar-width: none;
-}
-
-.days::-webkit-scrollbar {
-  display: none;
+  overflow: visible;
 }
 
 .day-card {
