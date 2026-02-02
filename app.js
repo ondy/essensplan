@@ -370,7 +370,7 @@ function createMealRow(label, dateKey) {
 
     const ratingBadge = document.createElement('span');
     ratingBadge.className = 'meal__rating-value';
-    ratingBadge.textContent = initialRating ? String(initialRating) : '';
+    ratingBadge.textContent = String(initialRating);
     ratingButton.appendChild(ratingBadge);
 
     const ratingMenu = document.createElement('div');
@@ -393,7 +393,7 @@ function createMealRow(label, dateKey) {
 
     const updateRatingDisplay = (value) => {
       entry.dataset.rating = String(value);
-      ratingBadge.textContent = value ? String(value) : '';
+      ratingBadge.textContent = String(value);
       ratingButton.textContent = value < 0 ? '👎' : '👍';
       ratingMenu.querySelectorAll('.meal__rating-option').forEach((option) => {
         const optionValue = Number(option.dataset.rating);
