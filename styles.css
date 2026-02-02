@@ -130,7 +130,9 @@ body {
   flex-direction: column;
   gap: 18px;
   min-height: var(--card-height);
+  width: var(--card-width);
   min-width: var(--card-width);
+  flex: 0 0 var(--card-width);
   position: relative;
   overflow: visible;
   scroll-snap-align: start;
@@ -217,6 +219,7 @@ body {
 .meal__field {
   position: relative;
   width: 100%;
+  min-width: 0;
 }
 
 .meal__input {
@@ -243,6 +246,8 @@ body {
 
 .meal__autocomplete {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   display: grid;
   gap: 6px;
   padding: 10px;
@@ -266,6 +271,9 @@ body {
   padding: 8px 10px;
   border-radius: 10px;
   font-size: 0.9rem;
+  width: 100%;
+  white-space: normal;
+  word-break: break-word;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
 }
