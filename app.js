@@ -395,6 +395,13 @@ function createMealRow(label, dateKey) {
       entry.dataset.rating = String(value);
       ratingBadge.textContent = value ? String(value) : '';
       ratingButton.textContent = value < 0 ? '👎' : '👍';
+      ratingMenu.querySelectorAll('.meal__rating-option').forEach((option) => {
+        const optionValue = Number(option.dataset.rating);
+        option.classList.toggle(
+          'meal__rating-option--active',
+          optionValue === value
+        );
+      });
     };
 
     const updateBonusState = async () => {
@@ -436,6 +443,7 @@ function createMealRow(label, dateKey) {
         updateRatingDisplay(option.value);
         saveInputs().catch(() => {});
         updateBonusState().catch(() => {});
+        closeMenu();
       });
       ratingMenu.appendChild(button);
     });
