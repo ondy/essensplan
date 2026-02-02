@@ -404,18 +404,10 @@ function calculateSlots() {
   }
   const styles = getComputedStyle(document.documentElement);
   const cardWidth = parseInt(styles.getPropertyValue('--card-width'), 10) || 280;
-  const cardHeight = parseInt(styles.getPropertyValue('--card-height'), 10) || 260;
   const gap = parseInt(styles.getPropertyValue('--gap'), 10) || 20;
   const width = (dayContainer && dayContainer.clientWidth) || window.innerWidth;
-  const height = window.innerHeight || cardHeight;
-  const headerElement = document.querySelector('.app__header');
-  const headerHeight = headerElement ? headerElement.offsetHeight : 0;
-  const availableHeight = Math.max(height - headerHeight - 140, cardHeight);
-
   const columns = Math.max(1, Math.floor((width + gap) / (cardWidth + gap)));
-  const rows = Math.max(1, Math.floor((availableHeight + gap) / (cardHeight + gap)));
-
-  return columns * rows;
+  return columns;
 }
 
 function renderDays() {

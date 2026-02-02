@@ -31,8 +31,8 @@ body {
 }
 
 .app {
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   padding: 32px 28px 40px;
   display: flex;
   flex-direction: column;
@@ -136,16 +136,6 @@ body {
   scroll-snap-align: start;
 }
 
-.day-card::after {
-  content: "";
-  position: absolute;
-  inset: auto -20% -50% auto;
-  width: 120px;
-  height: 120px;
-  background: var(--accent-soft);
-  border-radius: 50%;
-  opacity: 0.55;
-}
 
 .day-card__title {
   font-size: 1.5rem;
@@ -162,10 +152,6 @@ body {
   color: var(--accent-strong);
 }
 
-.day-card--today::after {
-  background: #cfe4d4;
-  opacity: 0.75;
-}
 .day-card__subtitle {
   font-size: 0.95rem;
   color: var(--muted);
