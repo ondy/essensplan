@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Essensplanung</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app__header">
+        <div>
+          <p class="app__eyebrow">Essensplanung</p>
+          <h1 class="app__title">Deine Essensplanung</h1>
+        </div>
+        <div class="app__actions" aria-label="Tage wechseln">
+          <button class="nav-button" type="button" id="prev-days" aria-label="Vorherige Tage">
+            ← <span class="nav-button__label">Vorherige Tage</span>
+          </button>
+          <button
+            class="nav-button nav-button--ghost"
+            type="button"
+            id="today-days"
+            aria-label="Heute"
+          >
+            ★ <span class="nav-button__label">Heute</span>
+          </button>
+          <button class="nav-button nav-button--primary" type="button" id="next-days" aria-label="Nächste Tage">
+            <span class="nav-button__label">Nächste Tage</span> →
+          </button>
+        </div>
+      </header>
+
+      <section class="days" id="days"></section>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
